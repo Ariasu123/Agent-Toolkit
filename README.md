@@ -2,7 +2,6 @@
 
 一个用于生成科研周报 DOCX 的 Codex skill。它可以扫描历史周报维护 `used.md` 已用文献清单，自动寻找未重复的相关文献，读取每周输入 Markdown，并按既有 Word 模板生成新的周报。
 
-适用方向包括红外气体传感、计算型光谱仪、光谱重建、微型光谱仪、滤波阵列光谱仪等。
 
 ## 功能
 
@@ -213,23 +212,3 @@ student-weekly-report-260719.docx
 ```text
 student-weekly-report-260719-v2.docx
 ```
-
-## 安全提示
-
-仓库的 `.gitignore` 已默认排除真实周报、输入文件、图片和渲染产物：
-
-```text
-*.docx
-used.md
-weekly-input.md
-images/
-```
-
-提交前建议检查：
-
-```bash
-git status
-git diff --cached --name-only
-```
-
-确认没有真实周报、实验图片或个人数据后再提交。
