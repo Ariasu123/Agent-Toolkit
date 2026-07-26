@@ -24,6 +24,7 @@ import textwrap
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,12 @@ BODY_FONT = "Times New Roman"
 EAST_ASIA_FONT = os.environ.get("WEEKLY_REPORT_CJK_FONT", "宋体")
 BODY_SIZE = Pt(12)
 HEADER_SIZE = Pt(14)
+PLACEHOLDER_CORRESPONDENCE_RE = re.compile(
+    r"(?:需根据|进一步确认|无法确认|不据此推测|待确认|未知|未提供|未包含|Crossref 返回)",
+    re.I,
+)
+OFFICIAL_SOURCE_BLOCKLIST = {"api.crossref.org", "doi.org", "dx.doi.org"}
+NUMERIC_RANGE_RE = re.compile(r"(?<![\d.\-/])(\d{1,3}(?:\.\d+)?)\s*[-–—]\s*(\d{1,3}(?:\.\d+)?)(?![\d.\-/])")
 
 
 @dataclass
@@ -105,6 +112,11 @@ def input_path_from_args(args, report_dir: Path) -> Path:
 
 def normalize_space(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(text or "").replace("\u00a0", " ")).strip()
+
+
+def normalize_numeric_ranges(text: str) -> str:
+    """Use ～ for short numeric intervals without touching dates or DOI strings."""
+    return NUMERIC_RANGE_RE.sub(r"\1～\2", text or "")
 
 
 def report_prefix_from_args(value: str | None) -> str:
@@ -214,6 +226,96 @@ def crossref_search(query: str, from_year: int = 2021, rows: int = 12) -> list[d
         return []
 
 
+class PublisherMetadataParser(HTMLParser):
+    """Collect publisher-supplied citation metadata and JSON-LD blocks."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.meta: dict[str, list[str]] = {}
+        self.json_ld: list[str] = []
+        self._in_json_ld = False
+        self._json_chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = {key.lower(): (value or "") for key, value in attrs}
+        if tag.lower() == "meta":
+            key = (attributes.get("name") or attributes.get("property") or "").lower()
+            value = attributes.get("content", "").strip()
+            if key and value:
+                self.meta.setdefault(key, []).append(html.unescape(value))
+        if tag.lower() == "script" and "ld+json" in attributes.get("type", "").lower():
+            self._in_json_ld = True
+            self._json_chunks = []
+
+    def handle_data(self, data: str) -> None:
+        if self._in_json_ld:
+            self._json_chunks.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "script" and self._in_json_ld:
+            payload = "".join(self._json_chunks).strip()
+            if payload:
+                self.json_ld.append(payload)
+            self._in_json_ld = False
+            self._json_chunks = []
+
+
+def fetch_publisher_metadata(url: str, timeout: float = 6.0) -> tuple[str, PublisherMetadataParser] | None:
+    if not url:
+        return None
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "weekly-report-skill/0.2 (+metadata verification)", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5"},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            final_url = response.geturl()
+            host = urllib.parse.urlparse(final_url).netloc.lower().split(":", 1)[0]
+            content_type = response.headers.get_content_type()
+            if host in OFFICIAL_SOURCE_BLOCKLIST or content_type not in {"text/html", "application/xhtml+xml"}:
+                return None
+            raw = response.read(1_500_000)
+            charset = response.headers.get_content_charset() or "utf-8"
+        parser = PublisherMetadataParser()
+        parser.feed(raw.decode(charset, errors="replace"))
+        parsed = urllib.parse.urlsplit(final_url)
+        return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", "")), parser
+    except Exception:
+        return None
+
+
+def affiliation_text(value: Any) -> str:
+    if isinstance(value, str):
+        return normalize_space(value)
+    if isinstance(value, dict):
+        return normalize_space(value.get("name") or value.get("text"))
+    if isinstance(value, list):
+        return "；".join(item for item in (affiliation_text(part) for part in value) if item)
+    return ""
+
+
+def verify_correspondence(paper: dict[str, Any]) -> dict[str, str] | None:
+    existing = paper.get("correspondence")
+    if isinstance(existing, dict):
+        author, unit, source_url = (normalize_space(existing.get(key, "")) for key in ("author", "unit", "source_url"))
+        host = urllib.parse.urlparse(source_url).netloc.lower().split(":", 1)[0]
+        if author and unit and source_url and host not in OFFICIAL_SOURCE_BLOCKLIST:
+            return {"author": author, "unit": unit, "source_url": source_url}
+    result = fetch_publisher_metadata(paper.get("url", ""))
+    if not result:
+        return None
+    source_url, parser = result
+    names = parser.meta.get("citation_author", [])
+    units = parser.meta.get("citation_author_institution", [])
+    emails = parser.meta.get("citation_author_email", [])
+    if len(emails) != 1 or not names:
+        return None
+    unit = units[0] if len(units) == 1 else (units[0] if len(names) == 1 and units else "")
+    if not unit:
+        return None
+    return {"author": normalize_space(names[0]), "unit": normalize_space(unit), "source_url": source_url}
+
+
 def first_date_year(message: dict[str, Any]) -> str:
     for key in ("published-print", "published-online", "published", "created"):
         parts = message.get(key, {}).get("date-parts")
@@ -257,7 +359,8 @@ def metadata_to_paper(message: dict[str, Any], query: str = "", score: float = 0
         "year": year,
         "venue": venue,
         "authors": authors,
-        "url": message.get("URL") or (f"https://doi.org/{doi}" if doi else ""),
+        "url": normalize_space(message.get("resource", {}).get("primary", {}).get("URL", ""))
+        or message.get("URL") or (f"https://doi.org/{doi}" if doi else ""),
         "citation": citation,
         "query": query,
         "score": round(score, 3),
@@ -291,9 +394,13 @@ def extract_week_text(doc: Document) -> str:
 
 
 def extract_citation(doc: Document) -> str:
-    if not doc.tables or len(doc.tables[0].rows) < 2:
+    if not doc.tables:
         return ""
-    return normalize_space(doc.tables[0].rows[1].cells[0].text)
+    for row in doc.tables[0].rows:
+        text = normalize_space(row.cells[0].text)
+        if extract_doi(text):
+            return text
+    return normalize_space(doc.tables[0].rows[1].cells[0].text) if len(doc.tables[0].rows) >= 2 else ""
 
 
 def occurrence_text(path: Path, week: str) -> str:
@@ -491,11 +598,15 @@ def select_paper(report_dir: Path, used_file: Path, report_prefix: str) -> dict[
     if not candidates:
         raise SystemExit("没有找到可用的未重复文献。")
     ranked = sorted(candidates.values(), key=lambda p: p.get("score", 0), reverse=True)
-    best = ranked[0]
-    if best.get("score", 0) < 5:
+    if not ranked or ranked[0].get("score", 0) < 5:
         raise SystemExit("没有找到高置信度的未重复相关文献。")
-    best["alternatives"] = ranked[1:4]
-    return best
+    for candidate in ranked:
+        correspondence = verify_correspondence(candidate)
+        if correspondence:
+            candidate["correspondence"] = correspondence
+            candidate["alternatives"] = []
+            return candidate
+    raise SystemExit("没有找到通讯作者及其单位可由出版社页面可靠核验的未重复文献；未生成周报。")
 
 
 def parse_weekly_input(input_path: Path) -> dict[str, Any]:
@@ -577,6 +688,7 @@ def set_paragraph_text(
     size=BODY_SIZE,
     alignment: WD_ALIGN_PARAGRAPH | None = WD_ALIGN_PARAGRAPH.LEFT,
 ) -> None:
+    text = normalize_numeric_ranges(text)
     clear_paragraph(paragraph)
     if alignment is not None:
         paragraph.alignment = alignment
@@ -658,6 +770,7 @@ def set_cell_text(
     bold: bool = False,
     alignment: WD_ALIGN_PARAGRAPH | None = WD_ALIGN_PARAGRAPH.LEFT,
 ) -> None:
+    text = normalize_numeric_ranges(text)
     remove_extra_cell_paragraphs(cell)
     first = cell.paragraphs[0]
     clear_paragraph(first)
@@ -675,12 +788,12 @@ def set_cell_text(
 def draft_literature_from_paper(paper: dict[str, Any]) -> dict[str, str]:
     title = paper.get("title", "该论文")
     citation = paper.get("citation") or f"{title}. DOI: {paper.get('doi', '')}."
-    venue = paper.get("venue", "")
+    correspondence = verify_correspondence(paper)
+    if not correspondence:
+        raise SystemExit("所选文献未通过通讯作者及单位核验；拒绝生成含占位信息的周报。")
     return {
         "citation": citation,
-        "corresponding_author_unit": "需根据论文全文或出版社页面进一步确认通讯作者单位；当前元数据来源为 "
-        + (venue or paper.get("source", "Crossref"))
-        + "。",
+        "corresponding_author_unit": "通讯作者：" + correspondence["author"] + "；单位：" + correspondence["unit"] + "。",
         "research_purpose": f"论文围绕“{title}”展开，目标是提升相关红外光谱传感或计算光谱系统在小型化、谱信息获取和算法反演方面的能力。该方向与当前 16 通道红外气体传感工作具有方法上的相似性：前端通道提供有限维响应，后端需要通过标定、校正和算法提取有效特征。",
         "research_methods": "作者基于红外光谱测量或计算光谱框架建立系统模型，并结合器件响应、光谱编码、数据处理和算法重建/识别流程进行验证。阅读时应重点关注其响应矩阵标定、噪声处理、训练数据构建、评价指标和与传统光谱仪或基准算法的对比方式。",
         "conclusions": "论文说明，红外光谱传感系统的性能不仅由硬件通道数量决定，也受通道响应差异性、标定精度、噪声水平和后端算法约束影响。该结论可为有限通道红外传感系统的设计和数据处理提供参考。",
@@ -718,6 +831,19 @@ def replace_literature_table(doc: Document, literature: dict[str, str]) -> None:
     for offset, (label, key) in enumerate(rows, start=2):
         set_cell_text(table.rows[offset].cells[0], label, bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER)
         set_cell_text(table.rows[offset].cells[1], literature[key], alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+
+def start_literature_on_new_page(doc: Document) -> None:
+    """Put the literature title into the table so title and table stay together."""
+    heading = find_heading(doc, "本周文献精读")
+    table = doc.tables[0]
+    title_row = table.add_row()
+    table._tbl.remove(title_row._tr)
+    table._tbl.insert(2, title_row._tr)
+    title_cell = title_row.cells[0].merge(title_row.cells[-1])
+    set_cell_text(title_cell, "本周文献精读", bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER)
+    title_cell.paragraphs[0].paragraph_format.page_break_before = True
+    heading._p.getparent().remove(heading._p)
 
 
 def parse_week_end_from_doc(path: Path, report_prefix: str | None = None) -> dt.date | None:
@@ -794,7 +920,12 @@ def literature_from_args(args, paper: dict[str, Any]) -> dict[str, str]:
     missing = [key for key in required if not normalize_space(literature.get(key, ""))]
     if missing:
         raise SystemExit("文献精读 JSON 缺少字段：" + ", ".join(missing))
-    return {key: normalize_space(literature[key]) for key in required}
+    normalized = {key: normalize_space(literature[key]) for key in required}
+    if PLACEHOLDER_CORRESPONDENCE_RE.search(normalized["corresponding_author_unit"]):
+        raise SystemExit("通讯作者单位包含未核验占位说明；拒绝生成周报。")
+    if not verify_correspondence(paper):
+        raise SystemExit("所选文献未通过通讯作者及单位核验；拒绝生成周报。")
+    return normalized
 
 
 def find_render_docx() -> Path | None:
@@ -903,6 +1034,7 @@ def generate_report(args) -> dict[str, Any]:
         input_data["other"],
     )
     replace_literature_table(doc, literature)
+    start_literature_on_new_page(doc)
     doc.save(output_path)
 
     used_synced = False
