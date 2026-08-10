@@ -13,9 +13,11 @@ Personal/                 # 个人能力（面向个人工作流）
 │   ├── handoff-skill/        # 会话交接管理 skill
 │   └── weekly-report-skill/  # 科研周报 skill
 └── MCP-Hub/              #   个人 MCP Servers
+    └── sandbox-docker-mcp/   # Docker 隔离的文件与 Shell MCP
 ```
 
 ## 说明
 
 - `Personal/Skill-Hub/` 下的两个 skill 分别从独立仓库 [handoff-skill] 与 [Weekly-report-skill] 以 `git subtree` 完整历史合并迁入，原始提交记录全部保留。
+- [`Personal/MCP-Hub/sandbox-docker-mcp/`](Personal/MCP-Hub/sandbox-docker-mcp/) 是从 Pion 抽离的独立 Docker 沙盒 MCP Server。
 - 新增 skill / MCP server 时，按"通用 vs 个人"归入 `General/` 或 `Personal/` 对应子目录。

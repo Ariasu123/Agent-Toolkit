@@ -1,0 +1,36 @@
+[project]
+name = "sandbox-docker-mcp"
+version = "0.1.0"
+description = "A hardened Docker sandbox exposed as a stdio MCP server"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Pion contributors" }]
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.29,<2",
+    "pydantic>=2.6",
+    "typer>=0.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+sandbox-docker-mcp = "sandbox_docker_mcp.cli:app"
+
+[project.urls]
+Repository = "https://github.com/Ariasu123/Agent-Toolkit/tree/main/Personal/MCP-Hub/sandbox-docker-mcp"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sandbox_docker_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
