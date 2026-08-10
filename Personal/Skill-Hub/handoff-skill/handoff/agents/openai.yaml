@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff"
+  short_description: "Capture and resume project session handoffs"
+  default_prompt: "Use $handoff to record the current project state and next steps."
