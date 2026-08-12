@@ -8,7 +8,14 @@ Agent 能力扩展件集合：可复用的 Agent Skills 与 MCP Servers。
 
 ```
 General/                  
-├── Skill-Hub/              
+├── Skill-Hub/
+│   ├── webapp-testing/
+│   ├── code-simplifier/
+│   ├── frontend-design/
+│   ├── mcp-builder/
+│   ├── skill-creator/
+│   ├── doc-coauthoring/
+│   └── smart-web-scraper/
 └── MCP-Hub/                 
 Personal/                 
 ├── Skill-Hub/               

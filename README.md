@@ -8,7 +8,14 @@ A collection of agent capability extensions: reusable Agent Skills and MCP Serve
 
 ```
 General/                  
-├── Skill-Hub/            
+├── Skill-Hub/
+│   ├── webapp-testing/
+│   ├── code-simplifier/
+│   ├── frontend-design/
+│   ├── mcp-builder/
+│   ├── skill-creator/
+│   ├── doc-coauthoring/
+│   └── smart-web-scraper/
 └── MCP-Hub/              
 Personal/                 
 ├── Skill-Hub/            
