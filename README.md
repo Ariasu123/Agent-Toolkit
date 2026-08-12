@@ -16,7 +16,10 @@ General/
 │   ├── skill-creator/
 │   ├── doc-coauthoring/
 │   └── smart-web-scraper/
-└── MCP-Hub/              
+└── MCP-Hub/
+    ├── figma-mcp/
+    ├── context7/
+    └── playwright-mcp/
 Personal/                 
 ├── Skill-Hub/            
 │   ├── handoff-skill/        
