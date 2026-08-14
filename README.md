@@ -23,7 +23,8 @@ General/
 Personal/                 
 ├── Skill-Hub/            
 │   ├── handoff-skill/        
-│   └── weekly-report-skill/  
+│   ├── weekly-report-skill/  
+│   └── first-principles-build-skill/
 └── MCP-Hub/              
     └── sandbox-docker-mcp/   
 ```
