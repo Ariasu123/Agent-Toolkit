@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-Agent 能力扩展件集合：可复用的 Agent Skills、MCP Servers 与 AI 开发工作流。
+Agent 能力扩展件集合：可复用的 Agent Skills、MCP Servers 与 Workflow。
 
 ## 目录结构
 
