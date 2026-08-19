@@ -23,10 +23,12 @@ General/
 Personal/                 
 ├── Skill-Hub/               
 │   ├── handoff-skill/         
-│   ├── weekly-report-skill/    
+│   ├── weekly-report-skill/
+│   ├── git-commit-skill/
 │   └── first-principles-build-skill/
 └── MCP-Hub/                
-    └── sandbox-docker-mcp/     
+    ├── sandbox-docker-mcp/
+    └── vision-bridge-mcp/
 ```
 
 - **`General/`** —— 优秀开源 Agent Skills 与 MCP Servers 的精选收录。

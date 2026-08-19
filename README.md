@@ -23,10 +23,12 @@ General/
 Personal/                 
 ├── Skill-Hub/            
 │   ├── handoff-skill/        
-│   ├── weekly-report-skill/  
+│   ├── weekly-report-skill/
+│   ├── git-commit-skill/
 │   └── first-principles-build-skill/
 └── MCP-Hub/              
-    └── sandbox-docker-mcp/   
+    ├── sandbox-docker-mcp/
+    └── vision-bridge-mcp/
 ```
 
 - **`General/`** — a curated collection of excellent open-source agent skills and MCP servers.
