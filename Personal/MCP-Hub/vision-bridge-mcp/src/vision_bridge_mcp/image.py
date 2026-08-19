@@ -40,6 +40,21 @@ _EXT_EXPECTED_MIME = {
 }
 
 
+def validate_image_bytes(data: bytes, max_bytes: int) -> str:
+    """校验图片字节内容（魔数 + 大小），返回嗅探出的 MIME。失败抛 ImageError。"""
+    if not data:
+        raise ImageError("图片内容为空")
+    if len(data) > max_bytes:
+        raise ImageError(
+            f"图片大小 {len(data)} 字节超过上限 {max_bytes} 字节，"
+            "可通过 VISION_MAX_IMAGE_BYTES 调整"
+        )
+    mime = _sniff_mime(data[:16])
+    if mime is None:
+        raise ImageError("内容不是受支持的图片格式（魔数校验失败）")
+    return mime
+
+
 def load_image_data_uri(image_path: str, max_bytes: int) -> str:
     """读取本地图片并返回 base64 data URI。任何校验失败都抛 ImageError。"""
     path = Path(image_path).expanduser()

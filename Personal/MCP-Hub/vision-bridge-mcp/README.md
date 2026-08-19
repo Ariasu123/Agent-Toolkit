@@ -1,7 +1,67 @@
 # vision-bridge-mcp
 
-`vision-bridge-mcp` 是一个独立的 stdio MCP Server，为不具备视觉能力的模型
-（如 DeepSeek 的 `deepseek-chat` / `deepseek-reasoner`）挂载识图能力：
+`vision-bridge-mcp` 为不具备视觉能力的模型（如 DeepSeek）挂载识图能力，
+提供两种使用模式：
+
+- **MCP 模式**（`vision-bridge-mcp`）：stdio MCP Server，模型通过 `view_image`
+  工具主动识图。适合任意支持 stdio MCP 的客户端
+- **代理模式**（`vision-bridge-proxy`）：本机 HTTP 代理，拦截含图片的请求并
+  把图片翻译成文字后转发。适合贴图被客户端能力门禁拦截的场景（如 kimi-code
+  + 无 `image_in` 能力的模型），实现 Cmd-V 直接贴图的原生体验
+
+## 代理模式（原生贴图体验）
+
+```text
+Cmd-V 贴图 → 客户端把图片（base64）发给"模型端点"
+          → 实际指向 127.0.0.1 上的 vision-bridge-proxy
+          → 代理调视觉模型把图片翻译成文字描述
+          → 替换后转发给真正的上游（默认 api.deepseek.com）
+          → 纯文本模型收到文字，正常回答（流式原样透传）
+```
+
+客户端的 `Authorization` 头原样透传给上游，代理只持有视觉模型的 key。
+
+### 启动
+
+```sh
+# 手动（调试）
+VISION_API_KEY=... VISION_BASE_URL=... VISION_MODEL_NAME=... vision-bridge-proxy
+```
+
+除 MCP 模式的三件套外，代理模式还有两个可选环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VISION_PROXY_UPSTREAM` | `https://api.deepseek.com/v1` | 上游模型端点 |
+| `VISION_PROXY_PORT` | `18990` | 监听端口（仅 127.0.0.1） |
+
+### launchd 开机自启（macOS）
+
+```sh
+# 按你的实际配置替换环境变量后写入 plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ariasu.vision-bridge-proxy.plist
+# 卸载
+launchctl bootout gui/$(id -u)/com.ariasu.vision-bridge-proxy.plist
+```
+
+### kimi-code 接入
+
+`~/.kimi-code/config.toml`：
+
+```toml
+[providers.deepseek]
+type = "openai"
+base_url = "http://127.0.0.1:18990/v1"   # 指向代理
+api_key = "..."                           # DeepSeek key 不变，由代理透传
+
+[models."deepseek/deepseek-v4-flash"]
+capabilities = [ "thinking", "tool_use", "image_in" ]   # 声明 image_in，通过客户端贴图门禁
+```
+
+**注意**：此后该 provider 的所有会话都经过本机代理；代理未运行时这些会话会
+连接失败（其他 provider 不受影响）。回退方法：把 `base_url` 改回官方地址即可。
+
+## MCP 模式
 
 ```text
 用户贴图 → CLI 客户端落盘为临时文件 → 文本模型拿到路径
