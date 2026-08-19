@@ -2,7 +2,7 @@
 
 [中文](README.zh-CN.md)
 
-A collection of agent capability extensions: reusable Agent Skills and MCP Servers.
+A collection of agent capability extensions: reusable Agent Skills, MCP Servers, and AI development workflows.
 
 ## Structure
 
@@ -29,10 +29,15 @@ Personal/
 └── MCP-Hub/              
     ├── sandbox-docker-mcp/
     └── vision-bridge-mcp/
+Workflows/
+├── spec-driven/
+├── ralph-loop/
+└── multi-agent/
 ```
 
 - **`General/`** — a curated collection of excellent open-source agent skills and MCP servers.
 - **`Personal/`** — personal, self-built skills and MCP servers for my own workflows.
+- **`Workflows/`** — methodology and templates for AI development workflows (spec-driven, autonomous loop, multi-agent orchestration).
 
 ## AGENTS.md
 
