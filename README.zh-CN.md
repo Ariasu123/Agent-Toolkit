@@ -15,6 +15,8 @@ General/
 │   ├── mcp-builder/
 │   ├── skill-creator/
 │   ├── doc-coauthoring/
+│   ├── firecrawl-cli/
+│   ├── firecrawl-parse/
 │   └── smart-web-scraper/
 └── MCP-Hub/
     ├── figma-mcp/

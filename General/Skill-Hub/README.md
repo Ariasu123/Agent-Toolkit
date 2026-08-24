@@ -13,6 +13,8 @@
 | **skill-creator** | 元工具：创建、打包、评测 skill，含 eval 运行与 description 优化脚本。 | [anthropics/skills](https://github.com/anthropics/skills) | Apache-2.0 |
 | **doc-coauthoring** | 三阶段协同写文档工作流：上下文收集 → 内容精炼 → 读者测试。 | [anthropics/skills](https://github.com/anthropics/skills) | Apache-2.0 |
 | **smart-web-scraper** | 基于 Playwright 的反爬网页抓取，可绕过 Cloudflare 等防护，输出文本 + 截图。 | [waisimon/playwright-scraper-skill](https://github.com/waisimon/playwright-scraper-skill) | MIT（作者 Simon Chan） |
+| **firecrawl-cli** | 通过 Firecrawl CLI 搜索、抓取网页并与页面交互，返回适配 LLM 上下文的干净 markdown。 | [firecrawl/cli](https://github.com/firecrawl/cli) | ISC |
+| **firecrawl-parse** | 把本地文件（PDF/DOCX/XLSX/HTML 等）解析为干净的 markdown 落盘。 | [firecrawl/cli](https://github.com/firecrawl/cli) | ISC |
 
 ## 说明
 
