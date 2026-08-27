@@ -27,7 +27,10 @@ Personal/
 │   ├── handoff-skill/        
 │   ├── weekly-report-skill/
 │   ├── git-commit-skill/
-│   └── first-principles-build-skill/
+│   ├── first-principles-build-skill/
+│   ├── brainstorm-skill/
+│   ├── url-research/
+│   └── lazy-senior/
 └── MCP-Hub/              
     ├── sandbox-docker-mcp/
     └── vision-bridge-mcp/
